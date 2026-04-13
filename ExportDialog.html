@@ -88,7 +88,7 @@
         padding: 10px 24px;
         border-radius: 4px;
         cursor: pointer;
-        margin-top: 18px;
+        margin-top: 14px;
         font-size: 14px;
         width: 100%;
       }
@@ -125,8 +125,8 @@
         color: #888;
       }
       .step {
-        margin-top: 20px;
-        padding-top: 16px;
+        margin-top: 16px;
+        padding-top: 14px;
         border-top: 1px solid #eee;
       }
       .step-label {
@@ -135,61 +135,90 @@
         color: #999;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        margin-bottom: 8px;
+      }
+      .prefill-link {
+        font-size: 11px;
+        color: #4a86c8;
+        cursor: pointer;
+        margin-top: 4px;
+        display: inline-block;
+      }
+      .prefill-link:hover {
+        text-decoration: underline;
       }
     </style>
   </head>
   <body>
     <h3>Export Comments to Sundial</h3>
 
-    <!-- Step 1: Enter Google Doc URL -->
+    <!-- Step 1: Enter folder URL -->
     <div id="step1">
-      <div class="step-label">Step 1: Select Document</div>
-      <label>Google Doc URL</label>
+      <div class="step-label">Step 1: Select Comments Folder</div>
+      <label>Google Drive Folder URL</label>
       <input
         type="text"
-        id="docUrl"
-        placeholder="https://docs.google.com/document/d/..."
+        id="folderUrl"
+        placeholder="https://drive.google.com/drive/folders/..."
       />
       <div class="help">
-        Paste the URL of the comments document created by this tool
+        The Drive folder created when you generated comment templates
       </div>
+      <span class="prefill-link" id="prefillLink" onclick="prefillLastFolder()" style="display:none">
+        Use last generated folder
+      </span>
       <button class="btn" onclick="loadPreview()">Load Preview</button>
     </div>
 
-    <!-- Step 2: Preview what will be exported -->
+    <!-- Step 2: Preview -->
     <div id="step2" style="display: none">
-      <div class="step-label">Step 2: Review</div>
+      <div class="step-label">Step 2: Review All Classes</div>
 
       <div class="section-summary" id="sectionSummary">
-        <div class="loading">Loading document...</div>
+        <div class="loading">Reading documents...</div>
       </div>
 
       <div class="totals" id="totals" style="display: none"></div>
 
       <div class="step">
-        <div class="step-label">Step 3: Export</div>
+        <div class="step-label">Step 3: Export to Sundial</div>
         <button
           class="btn btn-export"
           id="exportBtn"
           onclick="exportToSundial()"
           disabled
         >
-          Export to Sundial
+          Export All to Sundial
         </button>
         <div class="status" id="status"></div>
       </div>
     </div>
 
     <script>
-      var docUrl = "";
+      var folderUrl = "";
+      var lastFolder = "";
+
+      // Check if there's a previously generated folder
+      google.script.run
+        .withSuccessHandler(function (url) {
+          if (url) {
+            lastFolder = url;
+            document.getElementById("prefillLink").style.display = "inline-block";
+          }
+        })
+        .getLastCommentsFolder();
+
+      function prefillLastFolder() {
+        document.getElementById("folderUrl").value = lastFolder;
+      }
 
       function loadPreview() {
-        docUrl = document.getElementById("docUrl").value.trim();
-        if (!docUrl) return;
+        folderUrl = document.getElementById("folderUrl").value.trim();
+        if (!folderUrl) return;
 
         document.getElementById("step2").style.display = "block";
         document.getElementById("sectionSummary").innerHTML =
-          '<div class="loading">Reading comments from document...</div>';
+          '<div class="loading">Reading comments from all documents...</div>';
 
         google.script.run
           .withSuccessHandler(function (summary) {
@@ -201,13 +230,13 @@
               escapeHtml(err.message) +
               "</div>";
           })
-          .getCommentsSummary(docUrl);
+          .getCommentsSummaryFromFolder(folderUrl);
       }
 
       function renderSummary(summary) {
         var html =
           '<div class="section-row header">' +
-          "<span>Course</span><span>Comments</span>" +
+          "<span>Class</span><span>Comments</span>" +
           "</div>";
 
         for (var i = 0; i < summary.sections.length; i++) {
@@ -223,20 +252,13 @@
 
           html +=
             '<div class="section-row">' +
-            "<span>" +
-            escapeHtml(s.courseName) +
-            "</span>" +
-            '<span class="badge ' +
-            badgeClass +
-            '">' +
-            badgeText +
-            "</span>" +
+            "<span>" + escapeHtml(s.courseName) + "</span>" +
+            '<span class="badge ' + badgeClass + '">' + badgeText + "</span>" +
             "</div>";
         }
 
         document.getElementById("sectionSummary").innerHTML = html;
 
-        // Show totals
         var totalsEl = document.getElementById("totals");
         totalsEl.style.display = "block";
         totalsEl.innerHTML =
@@ -244,11 +266,12 @@
           summary.totalWithComments +
           " of " +
           summary.totalStudents +
-          " students have comments";
+          " students have comments across " +
+          summary.sections.length +
+          " classes";
 
-        // Enable export button if there are comments to export
-        var exportBtn = document.getElementById("exportBtn");
-        exportBtn.disabled = summary.totalWithComments === 0;
+        document.getElementById("exportBtn").disabled =
+          summary.totalWithComments === 0;
       }
 
       function exportToSundial() {
@@ -258,7 +281,8 @@
         btn.disabled = true;
         btn.textContent = "Exporting...";
         statusEl.className = "status";
-        statusEl.textContent = "Connecting to Sundial and pushing comments...";
+        statusEl.textContent =
+          "Reading all documents and pushing comments to Sundial...";
 
         google.script.run
           .withSuccessHandler(function (result) {
@@ -278,7 +302,7 @@
             btn.disabled = false;
             btn.textContent = "Retry Export";
           })
-          .exportCommentsToSundial(docUrl);
+          .exportCommentsToSundial(folderUrl);
       }
 
       function escapeHtml(text) {

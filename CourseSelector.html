@@ -26,7 +26,7 @@
         font-size: 13px;
       }
       .course-list {
-        max-height: 260px;
+        max-height: 220px;
         overflow-y: auto;
         border: 1px solid #ddd;
         border-radius: 4px;
@@ -100,6 +100,35 @@
         padding: 30px;
         color: #888;
       }
+      .results {
+        margin-top: 14px;
+        border: 1px solid #d4edda;
+        border-radius: 4px;
+        background: #f0faf0;
+        padding: 12px;
+        display: none;
+      }
+      .results a {
+        color: #4a86c8;
+        text-decoration: none;
+      }
+      .results a:hover {
+        text-decoration: underline;
+      }
+      .doc-link {
+        padding: 4px 0;
+        font-size: 13px;
+      }
+      .doc-link .count {
+        color: #888;
+        font-size: 11px;
+      }
+      .folder-link {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #c3e6cb;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -123,8 +152,10 @@
     <div class="status" id="status"></div>
 
     <button class="btn" id="generateBtn" onclick="generate()" disabled>
-      Generate Template
+      Generate Templates
     </button>
+
+    <div class="results" id="results"></div>
 
     <script>
       // Load courses when dialog opens
@@ -178,30 +209,54 @@
         var btn = document.getElementById("generateBtn");
         var errorEl = document.getElementById("error");
         var statusEl = document.getElementById("status");
+        var resultsEl = document.getElementById("results");
 
         btn.disabled = true;
         btn.textContent = "Generating...";
         errorEl.style.display = "none";
-        statusEl.textContent = "Fetching rosters and creating document...";
+        resultsEl.style.display = "none";
+        statusEl.textContent = "Fetching rosters and creating documents...";
 
         var checked = document.querySelectorAll('#courseList input[type="checkbox"]:checked');
         var courseIds = Array.from(checked).map(function (cb) { return cb.value; });
         var gradingPeriod = document.getElementById("gradingPeriod").value;
 
         google.script.run
-          .withSuccessHandler(function (docUrl) {
-            statusEl.innerHTML =
-              'Done! <a href="' + docUrl + '" target="_blank">Open Google Doc</a>';
+          .withSuccessHandler(function (result) {
+            statusEl.textContent = "";
             btn.textContent = "Done!";
+            showResults(result);
           })
           .withFailureHandler(function (err) {
             errorEl.style.display = "block";
             errorEl.textContent = "Error: " + err.message;
             btn.disabled = false;
-            btn.textContent = "Generate Template";
+            btn.textContent = "Generate Templates";
             statusEl.textContent = "";
           })
           .generateTemplate(courseIds, gradingPeriod);
+      }
+
+      function showResults(result) {
+        var html = "<strong>Created " + result.docs.length + " document(s):</strong><br><br>";
+
+        for (var i = 0; i < result.docs.length; i++) {
+          var doc = result.docs[i];
+          html +=
+            '<div class="doc-link">' +
+            '<a href="' + doc.url + '" target="_blank">' + escapeHtml(doc.name) + "</a> " +
+            '<span class="count">(' + doc.studentCount + " students)</span>" +
+            "</div>";
+        }
+
+        html +=
+          '<div class="folder-link">' +
+          '<a href="' + result.folderUrl + '" target="_blank">Open Drive folder</a>' +
+          "</div>";
+
+        var resultsEl = document.getElementById("results");
+        resultsEl.innerHTML = html;
+        resultsEl.style.display = "block";
       }
     </script>
   </body>

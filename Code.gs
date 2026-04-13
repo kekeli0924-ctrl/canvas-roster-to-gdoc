@@ -106,13 +106,23 @@ function generateTemplate(selectedCourseIds, gradingPeriod) {
     });
   }
 
-  // Create the Google Doc
-  var docUrl = createCommentsDoc(coursesData, gradingPeriod);
+  // Create one Google Doc per class (tabs per student), all in a Drive folder
+  var result = createAllCommentsDocs(coursesData, gradingPeriod);
+
+  // Store the folder URL for the Sundial export dialog
+  props.setProperty('LAST_COMMENTS_FOLDER', result.folderUrl);
 
   // Clean up temp data
   props.deleteProperty('TEMP_COURSES');
 
-  return docUrl;
+  return result;
+}
+
+/**
+ * Returns the last generated comments folder URL (for export dialog).
+ */
+function getLastCommentsFolder() {
+  return PropertiesService.getUserProperties().getProperty('LAST_COMMENTS_FOLDER') || '';
 }
 
 // ─────────────────────────────────────────────
@@ -157,27 +167,24 @@ function showExportDialog() {
  * @param {string} docUrl - URL of the completed comments Google Doc
  * @returns {Object} {success: number, failed: number, errors: []}
  */
-function exportCommentsToSundial(docUrl) {
-  // Step 1: Read comments from the Google Doc
-  var sections = readCommentsFromDoc(docUrl);
+function exportCommentsToSundial(folderUrl) {
+  // Step 1: Read comments from all docs in the folder
+  var allSections = readCommentsFromFolder(folderUrl);
 
-  // Step 2: For each section, match students to Sundial and push comments
+  // Step 2: For each class/section, match students to Sundial and push comments
   // TODO: Implement once Sundial API is available
   //
   // var allResults = { success: 0, failed: 0, errors: [] };
-  // for (var i = 0; i < sections.length; i++) {
-  //   var section = sections[i];
-  //   // Look up the Sundial section ID by course name
+  // for (var i = 0; i < allSections.length; i++) {
+  //   var section = allSections[i];
   //   var sundialSections = getSundialSections();
   //   var matched = sundialSections.find(s => s.course_name === section.courseName);
   //   if (!matched) {
   //     allResults.errors.push('Could not find Sundial section for: ' + section.courseName);
   //     continue;
   //   }
-  //   // Get Sundial roster and match students
   //   var sundialRoster = getSundialRoster(matched.section_id);
   //   var matchedStudents = matchStudentsToSundial(section.students, sundialRoster);
-  //   // Push each comment
   //   var result = pushAllCommentsForSection(matched.section_id, matchedStudents, matched.term);
   //   allResults.success += result.success;
   //   allResults.failed += result.failed;
@@ -185,9 +192,10 @@ function exportCommentsToSundial(docUrl) {
   // }
   // return allResults;
 
+  var totalStudents = allSections.reduce(function (sum, s) { return sum + s.students.length; }, 0);
   throw new Error(
     'Sundial export is not yet implemented.\n\n' +
-    'The document was read successfully (' + sections.length + ' sections found).\n' +
+    'Successfully read ' + allSections.length + ' class docs (' + totalStudents + ' students total).\n' +
     'Waiting for school admin to enable SKY API access.'
   );
 }
