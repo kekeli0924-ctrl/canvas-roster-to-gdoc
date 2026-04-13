@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        color: #333;
+      }
+      h3 {
+        margin-top: 0;
+        margin-bottom: 16px;
+      }
+      label.field-label {
+        display: block;
+        margin-top: 14px;
+        font-weight: bold;
+        font-size: 13px;
+      }
+      select {
+        width: 100%;
+        padding: 8px;
+        margin-top: 4px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      .course-list {
+        max-height: 260px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 8px;
+        margin-top: 8px;
+      }
+      .course-item {
+        padding: 6px 4px;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .course-item:last-child {
+        border-bottom: none;
+      }
+      .course-item input[type="checkbox"] {
+        margin-right: 10px;
+        flex-shrink: 0;
+      }
+      .course-item label {
+        font-weight: normal;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .select-all {
+        font-size: 12px;
+        color: #4a86c8;
+        cursor: pointer;
+        margin-top: 6px;
+        display: inline-block;
+      }
+      .select-all:hover {
+        text-decoration: underline;
+      }
+      .btn {
+        background: #4a86c8;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 18px;
+        font-size: 14px;
+        width: 100%;
+      }
+      .btn:hover {
+        background: #3a76b8;
+      }
+      .btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .status {
+        font-size: 12px;
+        color: #666;
+        margin-top: 10px;
+        min-height: 18px;
+      }
+      .status a {
+        color: #4a86c8;
+        font-weight: bold;
+      }
+      .error {
+        color: #d32f2f;
+        font-size: 12px;
+        margin-top: 8px;
+        display: none;
+      }
+      .loading {
+        text-align: center;
+        padding: 30px;
+        color: #888;
+      }
+    </style>
+  </head>
+  <body>
+    <label class="field-label">Grading Period</label>
+    <select id="gradingPeriod">
+      <option value="Fall Midterm">Fall Midterm</option>
+      <option value="Fall Term">Fall Term</option>
+      <option value="Winter Midterm">Winter Midterm</option>
+      <option value="Winter Term">Winter Term</option>
+      <option value="Spring Midterm">Spring Midterm</option>
+      <option value="Spring Term">Spring Term</option>
+    </select>
+
+    <label class="field-label">Select Courses</label>
+    <span class="select-all" onclick="toggleAll()">Select All / Deselect All</span>
+    <div class="course-list" id="courseList">
+      <div class="loading">Loading courses from Canvas...</div>
+    </div>
+
+    <div class="error" id="error"></div>
+    <div class="status" id="status"></div>
+
+    <button class="btn" id="generateBtn" onclick="generate()" disabled>
+      Generate Template
+    </button>
+
+    <script>
+      // Load courses when dialog opens
+      google.script.run
+        .withSuccessHandler(function (data) {
+          renderCourses(data);
+        })
+        .withFailureHandler(function (err) {
+          document.getElementById("courseList").innerHTML =
+            '<div class="loading" style="color:#d32f2f">Error: ' +
+            escapeHtml(err.message) +
+            "</div>";
+        })
+        .getStoredCourses();
+
+      function renderCourses(courses) {
+        var html = "";
+        for (var i = 0; i < courses.length; i++) {
+          var c = courses[i];
+          html +=
+            '<div class="course-item">' +
+            '<input type="checkbox" id="course_' + c.id + '" value="' + c.id + '" onchange="checkSelection()">' +
+            '<label for="course_' + c.id + '">' + escapeHtml(c.name) + "</label>" +
+            "</div>";
+        }
+        if (courses.length === 0) {
+          html = '<div class="loading">No courses found.</div>';
+        }
+        document.getElementById("courseList").innerHTML = html;
+      }
+
+      function escapeHtml(text) {
+        var div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function toggleAll() {
+        var boxes = document.querySelectorAll('#courseList input[type="checkbox"]');
+        var allChecked = Array.from(boxes).every(function (cb) { return cb.checked; });
+        boxes.forEach(function (cb) { cb.checked = !allChecked; });
+        checkSelection();
+      }
+
+      function checkSelection() {
+        var checked = document.querySelectorAll('#courseList input[type="checkbox"]:checked');
+        document.getElementById("generateBtn").disabled = checked.length === 0;
+      }
+
+      function generate() {
+        var btn = document.getElementById("generateBtn");
+        var errorEl = document.getElementById("error");
+        var statusEl = document.getElementById("status");
+
+        btn.disabled = true;
+        btn.textContent = "Generating...";
+        errorEl.style.display = "none";
+        statusEl.textContent = "Fetching rosters and creating document...";
+
+        var checked = document.querySelectorAll('#courseList input[type="checkbox"]:checked');
+        var courseIds = Array.from(checked).map(function (cb) { return cb.value; });
+        var gradingPeriod = document.getElementById("gradingPeriod").value;
+
+        google.script.run
+          .withSuccessHandler(function (docUrl) {
+            statusEl.innerHTML =
+              'Done! <a href="' + docUrl + '" target="_blank">Open Google Doc</a>';
+            btn.textContent = "Done!";
+          })
+          .withFailureHandler(function (err) {
+            errorEl.style.display = "block";
+            errorEl.textContent = "Error: " + err.message;
+            btn.disabled = false;
+            btn.textContent = "Generate Template";
+            statusEl.textContent = "";
+          })
+          .generateTemplate(courseIds, gradingPeriod);
+      }
+    </script>
+  </body>
+</html>
