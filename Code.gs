@@ -2,11 +2,18 @@
  * Adds the "Canvas Tools" menu when the spreadsheet opens.
  */
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('Canvas Tools')
+  var ui = SpreadsheetApp.getUi();
+
+  ui.createMenu('Canvas Tools')
     .addItem('Set Canvas API Token', 'showTokenDialog')
     .addSeparator()
     .addItem('Generate Comments Template', 'showCourseSelector')
+    .addToUi();
+
+  ui.createMenu('Sundial Export')
+    .addItem('Connect to Sundial', 'showSundialSetup')
+    .addSeparator()
+    .addItem('Export Comments to Sundial', 'showExportDialog')
     .addToUi();
 }
 
@@ -106,4 +113,81 @@ function generateTemplate(selectedCourseIds, gradingPeriod) {
   props.deleteProperty('TEMP_COURSES');
 
   return docUrl;
+}
+
+// ─────────────────────────────────────────────
+// Sundial Export Functions
+// ─────────────────────────────────────────────
+
+/**
+ * Opens the Sundial connection/setup dialog.
+ */
+function showSundialSetup() {
+  var html = HtmlService.createHtmlOutputFromFile('SundialSetup')
+    .setWidth(480)
+    .setHeight(450);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Connect to Sundial');
+}
+
+/**
+ * Opens the export dialog for pushing comments to Sundial.
+ */
+function showExportDialog() {
+  var status = checkSundialConnection();
+  if (!status.connected) {
+    SpreadsheetApp.getUi().alert(
+      'Not connected to Sundial.\n\n' + status.message +
+      '\n\nGo to: Sundial Export → Connect to Sundial'
+    );
+    return;
+  }
+
+  var html = HtmlService.createHtmlOutputFromFile('ExportDialog')
+    .setWidth(500)
+    .setHeight(550);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Export Comments to Sundial');
+}
+
+/**
+ * Main export function: reads comments from Google Doc and pushes to Sundial.
+ * Called from ExportDialog.html.
+ *
+ * TODO: Implement once Sundial API endpoints are confirmed.
+ *
+ * @param {string} docUrl - URL of the completed comments Google Doc
+ * @returns {Object} {success: number, failed: number, errors: []}
+ */
+function exportCommentsToSundial(docUrl) {
+  // Step 1: Read comments from the Google Doc
+  var sections = readCommentsFromDoc(docUrl);
+
+  // Step 2: For each section, match students to Sundial and push comments
+  // TODO: Implement once Sundial API is available
+  //
+  // var allResults = { success: 0, failed: 0, errors: [] };
+  // for (var i = 0; i < sections.length; i++) {
+  //   var section = sections[i];
+  //   // Look up the Sundial section ID by course name
+  //   var sundialSections = getSundialSections();
+  //   var matched = sundialSections.find(s => s.course_name === section.courseName);
+  //   if (!matched) {
+  //     allResults.errors.push('Could not find Sundial section for: ' + section.courseName);
+  //     continue;
+  //   }
+  //   // Get Sundial roster and match students
+  //   var sundialRoster = getSundialRoster(matched.section_id);
+  //   var matchedStudents = matchStudentsToSundial(section.students, sundialRoster);
+  //   // Push each comment
+  //   var result = pushAllCommentsForSection(matched.section_id, matchedStudents, matched.term);
+  //   allResults.success += result.success;
+  //   allResults.failed += result.failed;
+  //   allResults.errors = allResults.errors.concat(result.errors);
+  // }
+  // return allResults;
+
+  throw new Error(
+    'Sundial export is not yet implemented.\n\n' +
+    'The document was read successfully (' + sections.length + ' sections found).\n' +
+    'Waiting for school admin to enable SKY API access.'
+  );
 }
